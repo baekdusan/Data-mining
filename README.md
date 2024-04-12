@@ -23,6 +23,10 @@ java A1_G8_t1.java ./ex2.csv 0.6
 ```bash
 java A1_G8_t1.java ./numbers.csv 0.3
 ```
+- 마켓 데이터
+```bash
+java A1_G8_t1.java ./market.csv 0.3
+```
 ---
 - 데이터 셋 고정, support 값을 변경하는 실험
 ```bash
@@ -63,6 +67,10 @@ python3 A1_G8_t2.py ./ex2.csv 0.6
 - 랜덤 샘플링 정수 데이터
 ```bash
 python3 A1_G8_t2.py ./numbers.csv 0.3
+```
+- 마켓 데이터
+```bash
+python3 A1_G8_t2.py ./market.csv 0.3
 ```
 ---
 - 데이터 셋 고정, support 값을 변경하는 실험
