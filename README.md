@@ -8,13 +8,17 @@
 ---
 
 - 과제 제공 Data
-
+```bash
 java A1_G8_t1.java ./groceries.csv 0.15
-
+```
 - ppt 자료 예시 데이터
-
-java A1_G8_t2.java ./ex2.csv 0.6 
-
+```bash
+java A1_G8_t1.java ./ex2.csv 0.6 
+```
+- 랜덤 샘플링 정수 데이터
+```bash
+java A1_G8_t1.java ./numbers.csv 0.3
+```
 ---
 
 ### FP growth
@@ -24,14 +28,17 @@ java A1_G8_t2.java ./ex2.csv 0.6
 ---
 
 - 과제 제공 Data
-
+```bash
 python3 A1_G8_t2.py ./groceries.csv 0.15
-(or python)
-
+//  or 'python'
+```
 - ppt 자료 예시 데이터
-
+```bash
 python3 A1_G8_t2.py ./ex2.csv 0.6 
-(or python)
-
+```
+- 랜덤 샘플링 정수 데이터
+```bash
+python3 A1_G8_t2.py ./numbers.csv 0.3
+```
 ---
 

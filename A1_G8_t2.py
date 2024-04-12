@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
     # 데이터셋 읽기
     dataset, line = read_dataset_from_csv(args.filename)
-    print(args.filename, args.min_support, line)
+    
     # FP-Growth 알고리즘 실행
     frequent_itemsets = fp_growth(dataset, args.min_support * line)
     print_frequent_itemsets(frequent_itemsets, line)
