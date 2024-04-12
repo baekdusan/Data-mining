@@ -1,1 +1,40 @@
-For Intro to datamining course team project.
+Intro to Data mining 수업 첫번째 과제입니다.
+
+HOW TO IMPLEMENT
+
+1. Apriori
+- java 구현 완료
+
+
+----- In CLI -----
+
+- 과제 제공 Data
+
+java A1_G8_t1.java ./groceries.csv 0.15
+
+- ppt 자료 예시 데이터
+
+java A1_G8_t2.java ./ex2.csv 0.6 
+
+----- For Test -----
+
+
+
+2. FP growth
+- python 구현 -> java로 변경 계획하였으나, <python 완료, java 실패>인 관계로 둘 다 제출합니다.
+- 다행히 해당 Part는 java -> python 외에 나머지 기준은 모두 만족합니다.
+
+----- In CLI -----
+
+- 과제 제공 Data
+
+python3 A1_G8_t2.py ./groceries.csv 0.15
+(or python)
+
+- ppt 자료 예시 데이터
+
+python3 A1_G8_t2.py ./ex2.csv 0.6 
+(or python)
+
+----- For Test -----
+

@@ -8,7 +8,7 @@ public class A1_G8_t2 {
 
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.out.println("Usage: java FPGrowth <filename> <min_support>");
+            System.out.println("Usage: java A1_G8_t2.java <filename> <min_support>");
             return;
         }
 
@@ -169,7 +169,7 @@ public class A1_G8_t2 {
             }
             sb.setLength(sb.length() - 2);
             double support = (double) itemset.second / totalTransactions;
-            System.out.println(sb.toString() + ", " + support);
+            System.out.println(sb.toString() + " " + support);
         }
     }
 
@@ -195,11 +195,11 @@ public class A1_G8_t2 {
 }
 
 class TreeNode {
-    String name; // 항목 이름
-    int count; // 항목의 빈도
-    TreeNode nodeLink; // 동일한 항목을 가진 다음 노드에 대한 링크
-    TreeNode parent; // 부모 노드
-    Map<String, TreeNode> children; // 자식 노드들
+    String name;
+    int count;
+    TreeNode nodeLink;
+    TreeNode parent; 
+    Map<String, TreeNode> children;
 
     TreeNode(String name, int count, TreeNode parent) {
         this.name = name;

@@ -1,3 +1,6 @@
+import argparse # 파이썬 커맨드 라인에서 작성용
+import csv # 데이터 받기용
+
 class TreeNode:
     def __init__(self, name, count, parent):
         self.name = name  # 항목 이름
@@ -10,15 +13,18 @@ class TreeNode:
         self.count += count
 
 def create_tree(dataset, min_support):
+    # 먼저 각 아이템 별로 빈도 수를 계산하여 header_table에 담는다
     header_table = {}
     for transaction in dataset:
         for item in transaction:
             header_table[item] = header_table.get(item, 0) + dataset[transaction]
 
+    # 헤더 테이블에서 min_support를 넘지 못하는 녀석들은 모두 제거한다
     for item in list(header_table.keys()):
         if header_table[item] < min_support:
             del(header_table[item])
 
+    # 빈발 아이템 셋 구조 변경
     frequent_items = set(header_table.keys())
     if len(frequent_items) == 0:
         return None, None
@@ -26,8 +32,11 @@ def create_tree(dataset, min_support):
     for item in header_table:
         header_table[item] = [header_table[item], None]
 
+    # 루트 노드를 선언
     fp_tree = TreeNode('Null Set', 1, None)
+
     for transaction, count in dataset.items():
+        # print(transaction, count)
         local_d = {}
         for item in transaction:
             if item in frequent_items:
@@ -38,10 +47,13 @@ def create_tree(dataset, min_support):
 
     return fp_tree, header_table
 
+# 주어진 아이템 셋을 바탕으로 tree를 계속 업데이트 한다
 def update_tree(items, in_tree, header_table, count):
+    # 있으면 += 1
     if items[0] in in_tree.children:
         in_tree.children[items[0]].increase_count(count)
     else:
+        # 아니면 자식 만들고 집어 넣기
         in_tree.children[items[0]] = TreeNode(items[0], count, in_tree)
         if header_table[items[0]][1] is None:
             header_table[items[0]][1] = in_tree.children[items[0]]
@@ -50,16 +62,19 @@ def update_tree(items, in_tree, header_table, count):
     if len(items) > 1:
         update_tree(items[1:], in_tree.children[items[0]], header_table, count)
 
+# 노드를 계속 타고 들어가면서 타겟 노드까지 간 다음에 타겟 노드를 연결시킨다
 def update_header(node_to_test, target_node):
     while node_to_test.node_link is not None:
         node_to_test = node_to_test.node_link
     node_to_test.node_link = target_node
 
+# 말단 노드에서 부터 루트 노드까지 가면서 경로를 저장하는 녀석
 def ascend_tree(leaf_node, prefix_path):
     if leaf_node.parent is not None:
         prefix_path.append(leaf_node.name)
         ascend_tree(leaf_node.parent, prefix_path)
 
+# conditional pattern base를 찾는 과정, ascend_tree를 submethod로 이용함
 def find_prefix_path(base_pat, tree_node):
     conditional_patterns = {}
     while tree_node is not None:
@@ -70,6 +85,7 @@ def find_prefix_path(base_pat, tree_node):
         tree_node = tree_node.node_link
     return conditional_patterns
 
+# FP Tree를 모두 순회하면서 frequent item set을 찾는 과정
 def mine_tree(in_tree, header_table, min_support, pre_fix, frequent_item_list):
     big_l = [v[0] for v in sorted(header_table.items(), key=lambda p: p[1][0])]
     for base_pat in big_l:
@@ -82,16 +98,15 @@ def mine_tree(in_tree, header_table, min_support, pre_fix, frequent_item_list):
         if my_head is not None:
             mine_tree(my_cond_tree, my_head, min_support, new_freq_set, frequent_item_list)
 
-
+# 알고리즘의 시작, 반환값이 결과
 def fp_growth(dataset, min_support):
     fp_tree, header_table = create_tree(dataset, min_support)
     frequent_item_list = []
     mine_tree(fp_tree, header_table, min_support, set([]), frequent_item_list)
     return frequent_item_list
 
-import argparse
-import csv
-
+# csv 데이터를 불러오는 과정. 파이썬의 경우 csv를 불러오는 자원에 한계가 있어 보임.
+# 그래서 중복 데이터에는 빈도 수를 늘리면서 자원을 아끼고, 각 행마다 line += 1을 통해 전체 행 개수를 저장하였음.
 def read_dataset_from_csv(filename):
     lines = 0
     dataset = {}
@@ -106,6 +121,7 @@ def read_dataset_from_csv(filename):
                 dataset[items] = 1
     return dataset, lines
 
+# 양식에 맞게 출력하는 녀석
 def print_frequent_itemsets(frequent_itemsets, length):
     sorted_itemsets = sorted(frequent_itemsets, key=lambda x: x[1])  # 지지도를 기준으로 오름차순 정렬
     for itemset, support in sorted_itemsets:
