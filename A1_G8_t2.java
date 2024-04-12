@@ -1,282 +1,214 @@
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.stream.Collectors;
 import java.util.*;
 
 public class A1_G8_t2 {
+
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.err.println("Usage: java A1_G8_t2 <file_path> <min_support>");
-            System.exit(1);
+            System.out.println("Usage: java FPGrowth <filename> <min_support>");
+            return;
         }
 
-        String filePath = args[0];
+        String filename = args[0];
         double minSupport = Double.parseDouble(args[1]);
 
-        try {
-            List<List<String>> transactions = readCSVFile(filePath);
+        Map<Set<String>, Integer> dataset = readDatasetFromCSV(filename);
+        int totalTransactions = dataset.values().stream().mapToInt(Integer::intValue).sum();
+        int minSupportCount = (int) (minSupport * totalTransactions);
 
-            // FP-Tree 구축
-            
-            FPNode rootNode = new FPNode(null, null);
-            FPBuilder fpBuilder = new FPBuilder(transactions, rootNode, minSupport);
-            fpBuilder.buildFPTree();
-            
-            // 여기까지 FP-Tree 완성
+        List<Pair<Set<String>, Integer>> frequentItemsets = fpGrowth(dataset, minSupportCount);
+        printFrequentItemsets(frequentItemsets, totalTransactions);
+    }
+    
+    private static TreeNode createTree(Map<Set<String>, Integer> dataset, int minSupport) {
+        Map<String, Integer> headerTable = new HashMap<>();
+        for (Set<String> transaction : dataset.keySet()) {
+            for (String item : transaction) {
+                headerTable.put(item, headerTable.getOrDefault(item, 0) + dataset.get(transaction));
+            }
+        }
 
-            
-            FPGrowth fpGrowth = new FPGrowth(minSupport, transactions.size());
+        headerTable.entrySet().removeIf(entry -> entry.getValue() < minSupport);
 
-            fpGrowth.findFrequentItemsets(rootNode);
+        Set<String> frequentItems = new HashSet<>(headerTable.keySet());
+        if (frequentItems.isEmpty()) {
+            return null;
+        }
 
-            // 빈발 항목 집합과 그 지지도 값 출력
-            Map<List<String>, Double> frequentItemsets = fpGrowth.getFrequentItemsets();
-            for (Map.Entry<List<String>, Double> entry : frequentItemsets.entrySet()) {
-                System.out.println(entry.getKey() + " " + entry.getValue());
+        Map<String, Node> headerTableWithLinks = new HashMap<>();
+        for (String item : headerTable.keySet()) {
+            headerTableWithLinks.put(item, new Node(headerTable.get(item), null));
+        }
+
+        TreeNode fpTree = new TreeNode("Null Set", 1, null);
+        for (Map.Entry<Set<String>, Integer> entry : dataset.entrySet()) {
+            Set<String> transaction = entry.getKey();
+            int count = entry.getValue();
+            Map<String, Integer> localD = new HashMap<>();
+            for (String item : transaction) {
+                if (frequentItems.contains(item)) {
+                    localD.put(item, headerTableWithLinks.get(item).count);
+                }
+            }
+            if (!localD.isEmpty()) {
+                List<String> orderedItems = new ArrayList<>(localD.keySet());
+                orderedItems.sort((a, b) -> localD.get(b) - localD.get(a));
+                updateTree(orderedItems, fpTree, headerTableWithLinks, count);
+            }
+        }
+
+        return fpTree;
+    }
+
+    private static void updateTree(List<String> items, TreeNode inTree, Map<String, Node> headerTable, int count) {
+        if (inTree.children.containsKey(items.get(0))) {
+            inTree.children.get(items.get(0)).increaseCount(count);
+        } else {
+            TreeNode newNode = new TreeNode(items.get(0), count, inTree);
+            inTree.children.put(items.get(0), newNode);
+            Node node = headerTable.get(items.get(0));
+            if (node.nodeLink == null) {
+                node.nodeLink = newNode;
+            } else {
+                updateHeader(node.nodeLink, newNode);
+            }
+        }
+        if (items.size() > 1) {
+            updateTree(items.subList(1, items.size()), inTree.children.get(items.get(0)), headerTable, count);
+        }
+    }
+
+    private static void updateHeader(TreeNode nodeToTest, TreeNode targetNode) {
+        while (nodeToTest.nodeLink != null) {
+            nodeToTest = nodeToTest.nodeLink;
+        }
+        nodeToTest.nodeLink = targetNode;
+    }
+
+    private static void ascendTree(TreeNode leafNode, List<String> prefixPath) {
+        if (leafNode.parent != null) {
+            prefixPath.add(0, leafNode.name);
+            ascendTree(leafNode.parent, prefixPath);
+        }
+    }
+
+    private static Map<Set<String>, Integer> findPrefixPath(String basePat, TreeNode treeNode) {
+        Map<Set<String>, Integer> conditionalPatterns = new HashMap<>();
+        while (treeNode != null) {
+            List<String> prefixPath = new ArrayList<>();
+            ascendTree(treeNode, prefixPath);
+            if (prefixPath.size() > 1) {
+                Set<String> prefixSet = new HashSet<>(prefixPath.subList(1, prefixPath.size()));
+                conditionalPatterns.put(prefixSet, treeNode.count);
+            }
+            treeNode = treeNode.nodeLink;
+        }
+        return conditionalPatterns;
+    }
+
+    private static void mineTree(TreeNode inTree, Map<String, Node> headerTable, int minSupport, Set<String> prefix, List<Pair<Set<String>, Integer>> frequentItemList) {
+        List<String> bigL = new ArrayList<>(headerTable.keySet());
+        bigL.sort((a, b) -> headerTable.get(b).count - headerTable.get(a).count);
+        for (String basePat : bigL) {
+            Set<String> newFreqSet = new HashSet<>(prefix);
+            newFreqSet.add(basePat);
+            int support = headerTable.get(basePat).count;
+            frequentItemList.add(new Pair<>(newFreqSet, support));
+            Map<Set<String>, Integer> conditionalPatterns = findPrefixPath(basePat, headerTable.get(basePat).nodeLink);
+            TreeNode myCondTree = createTree(conditionalPatterns, minSupport);
+            if (myCondTree != null) {
+                Map<String, Node> myHead = new HashMap<>();
+                for (Set<String> itemSet : conditionalPatterns.keySet()) {
+                    for (String item : itemSet) {
+                        myHead.put(item, new Node(conditionalPatterns.get(itemSet), null));
+                        break; // Only add the first item from the itemSet
+                    }
+                }
+                mineTree(myCondTree, myHead, minSupport, newFreqSet, frequentItemList);
+            }
+        }
+    }
+
+    private static List<Pair<Set<String>, Integer>> fpGrowth(Map<Set<String>, Integer> dataset, int minSupport) {
+        TreeNode fpTree = createTree(dataset, minSupport);
+        List<Pair<Set<String>, Integer>> frequentItemList = new ArrayList<>();
+        if (fpTree != null) {
+            Map<String, Node> headerTable = new HashMap<>();
+            for (String item : fpTree.children.keySet()) {
+                headerTable.put(item, new Node(fpTree.children.get(item).count, fpTree.children.get(item)));
+            }
+            mineTree(fpTree, headerTable, minSupport, new HashSet<>(), frequentItemList);
+        }
+        return frequentItemList;
+    }
+
+    private static Map<Set<String>, Integer> readDatasetFromCSV(String filename) {
+        Map<Set<String>, Integer> dataset = new HashMap<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] items = line.split(",");
+                Set<String> transaction = new HashSet<>(Arrays.asList(items));
+                dataset.put(transaction, dataset.getOrDefault(transaction, 0) + 1);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return dataset;
     }
 
-    // CSV 불러오기
-    private static List<List<String>> readCSVFile(String filePath) throws IOException {
-        List<List<String>> transactions = new ArrayList<>(); // 각각의 행을 item 별로 파싱하여 넣어줌; 2차원 배열
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] items = line.split(",");
-                List<String> transaction = new ArrayList<>();
-                for (String item : items) {
-                    transaction.add(item.trim());
-                }
-                transactions.add(transaction);
+    private static void printFrequentItemsets(List<Pair<Set<String>, Integer>> frequentItemsets, int totalTransactions) {
+        frequentItemsets.sort((a, b) -> a.second - b.second);
+        for (Pair<Set<String>, Integer> itemset : frequentItemsets) {
+            StringBuilder sb = new StringBuilder();
+            for (String item : itemset.first) {
+                sb.append(item).append(", ");
             }
+            sb.setLength(sb.length() - 2);
+            double support = (double) itemset.second / totalTransactions;
+            System.out.println(sb.toString() + ", " + support);
         }
-        return transactions;
     }
-    
-    static class FPNode {
-        private String itemName;
-        private int count;
-        private FPNode parent;
-        private Map<String, FPNode> children;
-    
-        public FPNode(String itemName, FPNode parent) {
-            this.itemName = itemName;
-            this.count = 0;
-            this.parent = parent;
-            this.children = new HashMap<>();
-        }
-    
-        // Getters and setters
-    
-        public String getItemName() {
-            return itemName;
-        }
-    
-        public void setItemName(String itemName) {
-            this.itemName = itemName;
-        }
-    
-        public int getCount() {
-            return count;
-        }
-    
-        public void setCount(int count) {
+
+    private static class Node {
+        int count;
+        TreeNode nodeLink;
+
+        Node(int count, TreeNode nodeLink) {
             this.count = count;
-        }
-    
-        public FPNode getParent() {
-            return parent;
-        }
-    
-        public void setParent(FPNode parent) {
-            this.parent = parent;
-        }
-    
-        public Map<String, FPNode> getChildren() {
-            return children;
-        }
-    
-        public void setChildren(Map<String, FPNode> children) {
-            this.children = children;
-        }
-    
-        // FP 트리 시각화를 위한 메서드
-        // 각 층별로 출력하기 위한 BFS 활용 메서드
-        public static void printTreeByLevel(FPNode root) {
-            Queue<FPNode> queue = new LinkedList<>();
-            queue.add(root);
-            queue.add(null); // 층별 구분을 위한 마커로 null 사용
-
-            while (!queue.isEmpty()) {
-                FPNode currentNode = queue.poll();
-
-                if (currentNode == null) {
-                    System.out.println(); // 층이 끝났으므로 줄바꿈
-                    if (!queue.isEmpty()) {
-                        queue.add(null); // 다음 층 구분을 위해 null 추가
-                    }
-                } else {
-                    // 루트 노드는 itemName이 null입니다.
-                    if (currentNode.getItemName() == null) {
-                        System.out.print("Root ");
-                    } else {
-                        System.out.print(currentNode.getItemName() + ": " + currentNode.getCount() + " ");
-                    }
-
-                    // 현재 노드의 모든 자식을 큐에 추가
-                    for (FPNode child : currentNode.getChildren().values()) {
-                        queue.add(child);
-                    }
-                }
-            }
+            this.nodeLink = nodeLink;
         }
     }
-    
 
-    // FP Builder class
-    static class FPBuilder {
-        private List<List<String>> transactions;
-        private FPNode rootNode;
-        private Map<String, Integer> frequencyMap;
-        private double minSupport;
+    private static class Pair<T, U> {
+        T first;
+        U second;
 
-        public FPBuilder(List<List<String>> transactions, FPNode rootNode, double minSupport) {
-            this.transactions = transactions;
-            this.rootNode = rootNode;
-            this.frequencyMap = new HashMap<>();
-            this.minSupport = minSupport;
-            
+        Pair(T first, U second) {
+            this.first = first;
+            this.second = second;
         }
+    }
+}
 
-        public void buildFPTree() {
-            // 아이템 하나씩 빈도 계산하기
-            for (List<String> transaction : transactions) {
-                for (String item : transaction) {
-                    // 없으면 만들고 있으면 += 1
-                    frequencyMap.put(item, frequencyMap.getOrDefault(item, 0) + 1);
-                }
-            }
-            // frequencyMap 결과 예시: {a: 1, b: 4, c: 5 ...}
+class TreeNode {
+    String name; // 항목 이름
+    int count; // 항목의 빈도
+    TreeNode nodeLink; // 동일한 항목을 가진 다음 노드에 대한 링크
+    TreeNode parent; // 부모 노드
+    Map<String, TreeNode> children; // 자식 노드들
 
-            // minsup을 애초에 넘지 못하는 요소들은 바로 제거, ppt에서 Ordered items만 남겨 놓기.
-            frequencyMap.entrySet().removeIf(entry -> entry.getValue() / (double) transactions.size() < minSupport);
-            // frequencyMap 결과 예시: {b: 4, c: 5 ...}
-
-            // 행별 아이템 탐색
-            for (List<String> transaction : transactions) {
-                List<String> filteredTransaction = new ArrayList<>();
-                for (String item : transaction) {
-                    // transaction에 있는 아이템이 frequencyMap에 존재하는지 확인하고, 있으면 filteredTransaction
-                    if (frequencyMap.containsKey(item)) {
-                        filteredTransaction.add(item);
-                    }
-                }
-            
-                // 각 행별로 아이템들의 빈도를 체크하여 내림차순으로 정렬
-                filteredTransaction.sort((item1, item2) -> {
-                    int freqCompare = frequencyMap.get(item2).compareTo(frequencyMap.get(item1));
-                    if (freqCompare != 0) {
-                        return freqCompare;
-                    }
-                    return item1.compareTo(item2);
-                });
-
-                // 여기까지 하면 filteredTransaction 완성 -> ex> {f, c, a, m, p}
-            
-                // FP Tree 만들기
-                FPNode currentNode = rootNode;
-                for (String item : filteredTransaction) {
-                    if (currentNode.children.containsKey(item)) {
-                        // 현재 아이템이 이미 자식으로 존재한다면, 해당 노드를 현재 노드로 설정하고 카운트 증가
-                        currentNode = currentNode.children.get(item);
-                        currentNode.count++;
-                    } else {
-                        // 현재 아이템이 자식으로 존재하지 않는다면, 새 노드를 생성하고 현재 노드의 자식으로 추가
-                        FPNode newNode = new FPNode(item, currentNode);
-                        currentNode.children.put(item, newNode);
-                        currentNode = newNode; // 새롭게 생성된 노드를 현재 노드로 설정
-                        newNode.count = 1;
-                    }
-                }                
-            }
-            
-            // 빈도 배열 잘 나오는지 확인용
-            /*
-            System.out.println("Frequency Map:");
-            for (Map.Entry<String, Integer> entry : frequencyMap.entrySet()) {
-                System.out.println(entry.getKey() + ": " + entry.getValue());
-            }
-            */
-
-            // FP 트리 잘 나오는지 확인용
-            FPNode.printTreeByLevel(rootNode);
-        }
-        
+    TreeNode(String name, int count, TreeNode parent) {
+        this.name = name;
+        this.count = count;
+        this.parent = parent;
+        this.children = new HashMap<>();
     }
 
- // FP Growth algorithm
-    static class FPGrowth {
-        private double minSupport;
-        private int totalTransactions;
-        private Map<List<String>, Integer> frequentItemsets;
-
-        public FPGrowth(double minSupport, int totalTransactions) {
-            this.minSupport = minSupport;
-            this.totalTransactions = totalTransactions;
-            this.frequentItemsets = new HashMap<>();
-        }
-        
-        // 메인 클래스에서 fpGrowth.findFrequentItemsets(rootNode); 이렇게 실행
-        private void findFrequentItemsets(FPNode node, List<String> suffix, int suffixSupport) {
-            if (node.parent != null && !node.itemName.equals("")) { // 루트 노드와 아이템 이름이 없는 노드는 제외
-                suffix.add(0, node.itemName);
-                int support = Math.min(node.count, suffixSupport);
-
-                // 현재 값이 threshold 이상이면 그걸 넣는다
-                if (((double) support / totalTransactions) >= minSupport) {
-                    frequentItemsets.put(new ArrayList<>(suffix), support);
-                }
-                
-                // 조건부 FP 트리를 위한 접두사 경로 찾기
-                Map<String, Integer> conditionalItems = new HashMap<>();
-                FPNode currentNode = node;
-                while (currentNode.parent != null) {
-                    String itemName = currentNode.itemName;
-                    conditionalItems.put(itemName, conditionalItems.getOrDefault(itemName, 0) + currentNode.count);
-                    currentNode = currentNode.parent;
-                }
-
-                for (Map.Entry<String, Integer> entry : conditionalItems.entrySet()) {
-                    double itemSupport = (double) entry.getValue() / totalTransactions;
-                    if (itemSupport >= minSupport) {
-                        List<String> newSuffix = new ArrayList<>(suffix);
-                        newSuffix.add(0, entry.getKey());
-                        frequentItemsets.put(newSuffix, entry.getValue());
-                    }
-                }
-            }
-
-            for (FPNode child : node.children.values()) {
-                findFrequentItemsets(child, new ArrayList<>(suffix), node.count); // 재귀적으로 자식 노드 탐색
-            }
-        }
-
-        public void findFrequentItemsets(FPNode root) {
-            findFrequentItemsets(root, new ArrayList<>(), root.count);
-        }
-
-        // Getters and setters
-        public Map<List<String>, Double> getFrequentItemsets() {
-            return frequentItemsets.entrySet().stream()
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            entry -> entry.getValue() / (double) totalTransactions
-                    ));
-        }
-        
+    void increaseCount(int count) {
+        this.count += count;
     }
 }
