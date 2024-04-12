@@ -1,5 +1,6 @@
 import argparse # 파이썬 커맨드 라인에서 작성용
 import csv # 데이터 받기용
+import time
 
 class TreeNode:
     def __init__(self, name, count, parent):
@@ -107,13 +108,15 @@ def fp_growth(dataset, min_support):
 
 # csv 데이터를 불러오는 과정. 파이썬의 경우 csv를 불러오는 자원에 한계가 있어 보임.
 # 그래서 중복 데이터에는 빈도 수를 늘리면서 자원을 아끼고, 각 행마다 line += 1을 통해 전체 행 개수를 저장하였음.
-def read_dataset_from_csv(filename):
+def read_dataset_from_csv(filename, num= 0):
     lines = 0
     dataset = {}
     with open(filename, 'r', newline='') as csvfile:
         csvreader = csv.reader(csvfile)
         for row in csvreader:
             lines += 1
+            if num == lines and num != 0:
+                break
             items = frozenset(row)
             if items in dataset:
                 dataset[items] += 1
@@ -130,16 +133,25 @@ def print_frequent_itemsets(frequent_itemsets, length):
 
 
 if __name__ == "__main__":
+    # 실험용 시간 측정
+    start_time = time.time()
     # 커맨드 라인 인자 파싱
     parser = argparse.ArgumentParser(description='Run FP-Growth algorithm on a dataset.')
     parser.add_argument('filename', type=str, help='Path to the CSV file containing the dataset')
     parser.add_argument('min_support', type=float, help='Minimum support threshold')
+    parser.add_argument('num', type=float, help='portion of data')
     args = parser.parse_args()
 
     # 데이터셋 읽기
-    dataset, line = read_dataset_from_csv(args.filename)
-
+    dataset, line = read_dataset_from_csv(args.filename, args.num)
+    line = line if args.num == 0 else args.num
     # FP-Growth 알고리즘 실행
     frequent_itemsets = fp_growth(dataset, args.min_support * line)
-    print_frequent_itemsets(frequent_itemsets, line)
+    # print_frequent_itemsets(frequent_itemsets, line)
 
+    # 종료 시간 기록
+    end_time = time.time()
+
+    # 실행 시간 계산
+    execution_time = end_time - start_time
+    print("running time: ",execution_time)
