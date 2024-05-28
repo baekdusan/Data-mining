@@ -22,7 +22,7 @@ public class A2_G8_t1 {
             numClusters = Integer.parseInt(args[1]);
         }
 
-        List<DataPoint> dataPoints = loadCSVData(csvFilePath);
+        List<DataPoint> dataPoints = loadCSVData(csvFilePath); // 모든 데이터 포인트가 담겨 있음
 
         // 빈 파일 에러 처리
         if (dataPoints == null) {
@@ -57,7 +57,7 @@ public class A2_G8_t1 {
                 String[] tokens = line.split(","); // p1,25.0514,5.7475,1 -> ["p1", "25.0514", "5.7475", "1"]
                 String id = tokens[0];
                 double[] values = new double[tokens.length - 2];
-                // 마지막 열에 해당하는 값은 뭘까? 일단 이거는 무시하고 해보자
+                // 마지막 열에 해당하는 값은 무시
                 for (int i = 1; i < tokens.length - 1; i++) {
                     values[i - 1] = Double.parseDouble(tokens[i]);
                 }
@@ -70,46 +70,67 @@ public class A2_G8_t1 {
         return dataPoints;
     }
 
+    // 클러스터의 개수를 예측
     private static int estimateNumClusters(List<DataPoint> dataPoints) {
-        int maxK = 20;  // Maximum number of clusters to consider
-        double[] sse = new double[maxK];
-
-        for (int k = 1; k <= maxK; k++) {
+        int maxK = 31;  // 예시 데이터 기준 예상 최대 클러스터는 31; 이걸 어떻게 정해야 할지는 모르겠음
+        double bestSilhouette = Double.NEGATIVE_INFINITY; // 최댓값; 초기는 -inf
+        int bestK = 2; // 클러스터는 최소 2개 이상
+        
+        // 클러스터의 개수에 따라 분산도를 측정한다 -> 모든 경우의 수를 생각
+        for (int k = 2; k <= maxK; k++) {
             List<Cluster> clusters = kMeansPlusPlus(dataPoints, k);
-            sse[k - 1] = calculateSSE(clusters);
-        }
-
-        // Find the elbow point
-        return findElbowPoint(sse);
-    }
-
-    // 각 클러스터의 중심점과 모든 데이터 포인트 사이의 거리의 합
-    private static double calculateSSE(List<Cluster> clusters) {
-        double sse = 0.0;
-        for (Cluster cluster : clusters) {
-            DataPoint center = cluster.getCenter();
-            for (DataPoint point : cluster.getPoints()) {
-                sse += point.distanceTo(center);
-            }
-        }
-        return sse;
-    }
-
-    // 몇 개의 클러스터로 나눌지 2번째 인자가 주어지지 않는다면
-    // 갑자기 에러 값이 가장 커지는 순간을 찾는다
-    private static int findElbowPoint(double[] sse) {
-        int elbowPoint = 1;
-        double maxChange = 0.0;
-
-        for (int i = 1; i < sse.length - 1; i++) {
-            double change = sse[i - 1] - sse[i];
-            if (change > maxChange) {
-                maxChange = change;
-                elbowPoint = i + 1;
+            double silhouette = calculateSilhouetteScore(dataPoints, clusters);
+            // System.out.println("Silhouette score for k=" + k + ": " + silhouette);
+            if (silhouette > bestSilhouette) {
+                bestSilhouette = silhouette;
+                bestK = k;
             }
         }
 
-        return elbowPoint;
+        return bestK;
+    }
+
+    // 실루엣 점수를 계산하는 함수
+    private static double calculateSilhouetteScore(List<DataPoint> dataPoints, List<Cluster> clusters) {
+        double totalScore = 0.0;
+        for (DataPoint point : dataPoints) {
+            // 각 데이터 포인트 하나하나마다 그 포인트가 속해있는 클러스터 내에서 평균 거리를 측정하고 (내부와의 평균 거리)
+            double a = calculateAverageDistance(point, clusters.get(findClusterIndex(point, clusters)).getPoints());
+            double b = Double.MAX_VALUE;
+            for (Cluster cluster : clusters) {
+                if (!cluster.getPoints().contains(point)) {
+                    // 그 데이터 포인트와 외부 클러스터간 평균 거리를 구한 후
+                    double distance = calculateAverageDistance(point, cluster.getPoints());
+                    if (distance < b) {
+                        // 가장 가까운 외부 클러스터와의 거리를 찾아준다
+                        b = distance;
+                    }
+                }
+            }
+            // Kaufman, L., & Rousseeuw, P. J. (1987). Finding Groups in Data: An Introduction to Cluster Analysis. John Wiley & Sons.
+            // 위 논문에 기반한 실루엣 점수 계산; 얼마나 올바른 클러스터 내에 속해있는지를 판단해 줌.
+            totalScore += (b - a) / Math.max(a, b);
+        }
+        return totalScore / dataPoints.size();
+    }
+
+    // 데이터 포인트(point)에서 points에 속해 있는 모든 other 까지의 평균 거리를 계산하는 함수
+    private static double calculateAverageDistance(DataPoint point, List<DataPoint> points) {
+        double totalDistance = 0.0;
+        for (DataPoint other : points) {
+            totalDistance += point.distanceTo(other);
+        }
+        return totalDistance / points.size();
+    }
+
+    // 데이터 포인트가 속한 클러스터의 인덱스를 찾는 함수; 몇번째 클러스터에 있는지 확인할 수 있음
+    private static int findClusterIndex(DataPoint point, List<Cluster> clusters) {
+        for (int i = 0; i < clusters.size(); i++) {
+            if (clusters.get(i).getPoints().contains(point)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     // 주요 함수: data point들의 리스트와 클러스터의 개수를 입력으로 받음.
@@ -137,19 +158,23 @@ public class A2_G8_t1 {
         // 제일 가까운 데이터 포인트들을 모아 그 중심에 위치하기
         boolean converged;
         do {
+            // 클러스터 비워준 뒤
             for (Cluster cluster : clusters) {
                 cluster.clearPoints();
             }
 
-            // Assign points to the nearest cluster
+            // 각각의 데이터 포인트들 새 클러스터로 재삽입
             for (DataPoint point : dataPoints) {
                 Cluster nearestCluster = findNearestCluster(point, clusters);
                 nearestCluster.addPoint(point);
             }
 
             converged = true;
-            // Update cluster centers
+            // 클러스터 데이터 리스트에는 새로운 데이터 포인트들이 모여 있음.
+            // 이를 바탕으로 새로운 중심점을 계산하여 업데이트 해주는데
             for (Cluster cluster : clusters) {
+                // 만약 업데이트 된 클러스터의 중심점이 변화가 없으면
+                // 이제 더이상 iteration을 할 필요가 없다는 소리임. -> 그럼 do while문 탈출
                 converged &= cluster.updateCenter();
             }
         } while (!converged);
@@ -210,6 +235,7 @@ public class A2_G8_t1 {
         return dataPoints.get(dataPoints.size() - 1);
     }
 
+    // 해당 데이터 포인트에 가장 가까운 중심점을 가진 클러스터 반환
     private static Cluster findNearestCluster(DataPoint point, List<Cluster> clusters) {
         Cluster nearestCluster = null;
         double minDistance = Double.MAX_VALUE;
@@ -223,6 +249,7 @@ public class A2_G8_t1 {
         return nearestCluster;
     }
 
+    // 데이터 포인트 자료형
     static class DataPoint {
         private final String id;
         private final double[] coordinates;
@@ -251,6 +278,7 @@ public class A2_G8_t1 {
         }
     }
 
+    // 클러스터 자료형; 중심 데이터포인트와 나머지 데이터 포인트들의 배열로 이루어짐.
     static class Cluster {
         // 중심점과 그 주위로 형성된 데이터 포인트들
         private DataPoint center;
@@ -272,6 +300,7 @@ public class A2_G8_t1 {
             return points;
         }
 
+        // 포인트 배열 비우기
         public void clearPoints() {
             points.clear();
         }
