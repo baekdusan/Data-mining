@@ -60,6 +60,6 @@ java A2_G2_t2 ./artd-31.csv 0.5
 python3 kMeans.py ./moons_dataset_only.csv 7
 ```
 ```bash
-python3 dbscan.py ./moons_dataset_only.csv 4
+python3 dbscan_moon.py
 ```
 - 같은 데이터셋에서 k-Means와 DBSCAN의 차이로 인한 결과를 시각적으로 비교할 수 있음
