@@ -43,5 +43,23 @@ python3 estimated.py ./artd-31.csv
 #### 코드 실행
 - k-means++ 에서 사용한 데이터 역시 모두 DBSCAN에서 사용 가능함.
 ```bash
+//eps, mu 모두 주어짐
 java A2_G2_t2 ./artd-31.csv 5 0.5
+
+// mu 만 주어짐
+java A2_G2_t2 ./artd-31.csv 5
+
+// eps 만 주어짐
+java A2_G2_t2 ./artd-31.csv 0.5
 ```
+#### 실험
+##### 1. k-Means와 DBSCAN의 차이
+- 주어진 데이터의 클러스터링 결과를 시각적으로 비교하기 위해 파이썬의 내장 함수를 사용함.
+- 방법은 java와 동일함.
+```bash
+python3 kMeans.py ./moons_dataset_only.csv 7
+```
+```bash
+python3 dbscan.py ./moons_dataset_only.csv 4
+```
+- 같은 데이터셋에서 k-Means와 DBSCAN의 차이로 인한 결과를 시각적으로 비교할 수 있음
