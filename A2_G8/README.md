@@ -57,7 +57,7 @@ java A2_G2_t2 ./artd-31.csv 0.5
 - 주어진 데이터의 클러스터링 결과를 시각적으로 비교하기 위해 파이썬의 내장 함수를 사용함.
 - 방법은 java와 동일함.
 ```bash
-python3 kMeans.py ./moons_dataset_only.csv 7
+python3 dbscan_blob.py
 ```
 ```bash
 python3 dbscan_moon.py
